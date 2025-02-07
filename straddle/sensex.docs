@@ -1,0 +1,150 @@
+import os
+import json
+import asyncio
+import datetime
+import logging
+from channels.generic.websocket import AsyncWebsocketConsumer
+from fyers_apiv3 import fyersModel
+from dotenv import load_dotenv
+from .models import StraddlePrice
+
+# Load environment variables
+load_dotenv()
+
+# API Credentials
+ACCESS_TOKEN = os.getenv("FYERS_ACCESS_TOKEN")
+CLIENT_ID = os.getenv("FYERS_CLIENT_ID")
+if not ACCESS_TOKEN or not CLIENT_ID:
+    raise ValueError("Missing Fyers API credentials. Check your .env file.")
+
+# Initialize Fyers API
+fyers = fyersModel.FyersModel(client_id=CLIENT_ID, token=ACCESS_TOKEN, is_async=False)
+
+# Logging Setup
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+# Data Storage for Live Updates
+price_history = {"timestamps": [], "straddle_prices": []}
+
+class StraddleConsumer(AsyncWebsocketConsumer):
+    """WebSocket Consumer for fetching ATM straddle prices."""
+
+    async def connect(self):
+        await self.accept()
+        logging.info("WebSocket Connection Established.")
+        self.is_active = True
+        asyncio.create_task(self.fetch_and_send_data())
+
+    async def disconnect(self, close_code):
+        self.is_active = False
+        logging.warning(f"WebSocket Disconnected. Close Code: {close_code}")
+
+    async def fetch_and_send_data(self):
+        while self.is_active:
+            try:
+                data = await asyncio.to_thread(self.get_atm_straddle)
+                if data:
+                    atm_strike, call_price, put_price = data
+                    straddle_price = call_price + put_price
+                    timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+
+                    await asyncio.to_thread(self.save_to_db, atm_strike, call_price, put_price, straddle_price)
+
+                    price_history["timestamps"].append(timestamp)
+                    price_history["straddle_prices"].append(straddle_price)
+
+                    if len(price_history["timestamps"]) > 100:
+                        price_history["timestamps"].pop(0)
+                        price_history["straddle_prices"].pop(0)
+
+                    await self.send(json.dumps({
+                        "timestamp": timestamp,
+                        "atm_strike": atm_strike,
+                        "call_price": call_price,
+                        "put_price": put_price,
+                        "straddle_price": straddle_price
+                    }))
+
+                await asyncio.sleep(2)
+            except Exception as e:
+                logging.error(f"WebSocket Error: {e}")
+
+    def get_atm_straddle(self):
+        try:
+            symbol = "BSE:SENSEX-INDEX"  # Check if this is the correct symbol
+            response = fyers.quotes({"symbols": symbol})
+
+            logging.debug(f"Fyers API Response: {response}")  # Log full response
+
+            if not response or "d" not in response or not response["d"]:
+                logging.error("Invalid API Response: %s", response)
+                return None
+
+            market_data = response["d"][0]["v"]
+            ltp = market_data.get("lp")
+
+            if ltp is None:
+                logging.error("LTP not found in response: %s", response)
+                return None
+
+            atm_strike = round(ltp / 50) * 50
+            expiry = self.get_today_expiry()
+
+            atm_call_symbol = f"BSE:SENSEX{expiry}{atm_strike}CE"
+            atm_put_symbol = f"BSE:SENSEX{expiry}{atm_strike}PE"
+            option_response = fyers.quotes({"symbols": f"{atm_call_symbol},{atm_put_symbol}"})
+
+            logging.debug(f"Option Chain Response: {option_response}")
+
+            if not option_response or "d" not in option_response:
+                logging.error("Invalid Option Chain Response: %s", option_response)
+                return None
+
+            call_price, put_price = None, None
+            for data in option_response["d"]:
+                name = data.get("n", "")
+                price = data["v"].get("lp", 0)
+                if "CE" in name:
+                    call_price = price
+                elif "PE" in name:
+                    put_price = price
+
+            if call_price is None or put_price is None:
+                logging.error("Failed to fetch option prices")
+                return None
+
+            return atm_strike, call_price, put_price
+
+        except Exception as e:
+            logging.error(f"API Error: {e}")
+            return None
+
+    def save_to_db(self, atm_strike, call_price, put_price, straddle_price):
+        try:
+            StraddlePrice.objects.create(
+                atm_strike=atm_strike,
+                call_price=call_price,
+                put_price=put_price,
+                straddle_price=straddle_price
+            )
+            logging.info(f"Data Saved: {atm_strike} | {call_price} | {put_price} | {straddle_price}")
+        except Exception as e:
+            logging.error(f"Database Save Error: {e}")
+
+    def get_today_expiry(self):
+        """Get the expiry date dynamically for every upcoming Tuesday."""
+        today = datetime.date.today()
+        # Calculate the number of days to the next Tuesday (weekday = 1 for Tuesday)
+        days_until_tuesday = (1 - today.weekday()) % 7
+        next_tuesday = today + datetime.timedelta(days=days_until_tuesday)
+
+        # Format the expiry date as per Fyers' symbol format
+        month_map = {
+            1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6", 
+            7: "7", 8: "8", 9: "9", 10: "O", 11: "N", 12: "D"
+        }
+        
+        formatted_expiry = f"{next_tuesday.year % 100:02d}{month_map[next_tuesday.month]}{next_tuesday.day:02d}"
+        logging.debug(f"Formatted Expiry: {formatted_expiry}")
+        print(formatted_expiry)
+        return formatted_expiry

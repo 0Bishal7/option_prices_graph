@@ -1,0 +1,57 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Straddle Price</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h2>Live Straddle Price Chart</h2>
+    <canvas id="straddleChart"></canvas>
+
+    <script>
+        const ctx = document.getElementById('straddleChart').getContext('2d');
+        let labels = [];
+        let straddlePrices = [];
+
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Straddle Price',
+                    borderColor: 'blue',
+                    backgroundColor: 'rgba(0, 0, 255, 0.2)',
+                    data: straddlePrices
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { title: { display: true, text: 'Time' } },
+                    y: { title: { display: true, text: 'Straddle Price' } }
+                }
+            }
+        });
+
+        // WebSocket Connection
+        const socket = new WebSocket('ws://localhost:8000/ws/straddle/');
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            const currentTime = new Date().toLocaleTimeString();
+            
+            labels.push(currentTime);
+            straddlePrices.push(data.straddle_price);
+
+            if (labels.length > 30) {
+                labels.shift();
+                straddlePrices.shift();
+            }
+
+            chart.update();
+        };
+    </script>
+</body>
+</html>   
