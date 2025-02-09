@@ -20,7 +20,7 @@ fyers = fyersModel.FyersModel(client_id=CLIENT_ID, token=ACCESS_TOKEN, is_async=
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-price_history = {"timestamps": [], "nifty_straddle": [], "sensex_straddle": []}
+price_history = {"timestamps": [], "nifty_straddle": [], "sensex_straddle": [],"bankex_straddle":[],"finnifty_straddle":[],"midcapnifty_straddle":[]}
 
 class StraddleConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -34,40 +34,18 @@ class StraddleConsumer(AsyncWebsocketConsumer):
         """Handle WebSocket disconnection."""
         self.is_active = False
         logging.warning(f"WebSocket Disconnected. Close Code: {close_code}")
-    # async def connect(self):
-    #     self.symbol = self.scope["url_route"]["kwargs"]["symbol"]  # Get symbol from URL
-    #     await self.accept()
-    #     await self.send(text_data=json.dumps({"message": f"Connected to {self.symbol}"}))
-    #     self.is_active = True
-
-    #     asyncio.create_task(self.fetch_and_send_data())
-
-
-    # async def disconnect(self, close_code):
-    #     self.is_active = False
-    #     logging.warning(f"WebSocket Disconnected. Close Code: {close_code}")
-
-
-    #     print(f"Disconnected from {self.symbol}")
-
-    # async def receive(self, text_data):
-    #     data = json.loads(text_data)
-    #     await self.send(text_data=json.dumps({"message": f"Received: {data}"}))
-    # # async def connect(self):
-    # #     await self.accept()
-    # #     logging.info("WebSocket Connection Established.")
-    # #     self.is_active = True
-    # #     asyncio.create_task(self.fetch_and_send_data())
-
-    # # async def disconnect(self, close_code):
-    # #     self.is_active = False
-    # #     logging.warning(f"WebSocket Disconnected. Close Code: {close_code}")
-
+    
     async def fetch_and_send_data(self):
         while self.is_active:
             try:
                 nifty_data = await asyncio.to_thread(self.get_atm_straddle, "NIFTY50")
                 sensex_data = await asyncio.to_thread(self.get_atm_straddle, "SENSEX")
+                bankex_data = await asyncio.to_thread(self.get_atm_straddle, "BANKEX")
+                finnifty_data = await asyncio.to_thread(self.get_atm_straddle, "FINNIFTY")
+                midcapnifty_data = await asyncio.to_thread(self.get_atm_straddle, "MIDCPNIFTY")
+
+
+
                 timestamp = datetime.datetime.now().strftime("%H:%M:%S")
 
                 if nifty_data:
@@ -83,15 +61,49 @@ class StraddleConsumer(AsyncWebsocketConsumer):
                     await asyncio.to_thread(self.save_to_db, "SENSEX", atm_strike, call_price, put_price, straddle_price)
                     price_history["sensex_straddle"].append(straddle_price)
 
+                
+                if bankex_data:
+                    atm_strike, call_price, put_price = bankex_data
+                    straddle_price = call_price + put_price
+                    await asyncio.to_thread(self.save_to_db, "BANKEX", atm_strike, call_price, put_price, straddle_price)
+                    price_history["bankex_straddle"].append(straddle_price)
+
+                
+                if finnifty_data:
+                    atm_strike, call_price, put_price = finnifty_data
+                    straddle_price = call_price + put_price
+                    await asyncio.to_thread(self.save_to_db, "FINNIFTY", atm_strike, call_price, put_price, straddle_price)
+                    price_history["finnifty_straddle"].append(straddle_price)
+                
+
+                if midcapnifty_data:
+                    atm_strike, call_price, put_price = midcapnifty_data
+                    straddle_price = call_price + put_price
+                    await asyncio.to_thread(self.save_to_db, "MIDCPNIFTY", atm_strike, call_price, put_price, straddle_price)
+                    price_history["midcapnifty_straddle"].append(straddle_price)
+
                 if len(price_history["timestamps"]) > 100:
                     price_history["timestamps"].pop(0)
                     price_history["nifty_straddle"].pop(0)
                     price_history["sensex_straddle"].pop(0)
+                    price_history["bankex_straddle"].pop(0)
+                    price_history["finnifty_straddle"].pop(0)
+                    price_history["midcapnifty_straddle"].pop(0)
+
+
+
 
                 await self.send(json.dumps({
                     "timestamp": timestamp,
                     "nifty": {"atm_strike": nifty_data[0], "call_price": nifty_data[1], "put_price": nifty_data[2], "straddle_price": nifty_data[1] + nifty_data[2]} if nifty_data else None,
-                    "sensex": {"atm_strike": sensex_data[0], "call_price": sensex_data[1], "put_price": sensex_data[2], "straddle_price": sensex_data[1] + sensex_data[2]} if sensex_data else None
+                    "sensex": {"atm_strike": sensex_data[0], "call_price": sensex_data[1], "put_price": sensex_data[2], "straddle_price": sensex_data[1] + sensex_data[2]} if sensex_data else None,
+                    "bankex": {"atm_strike": bankex_data[0], "call_price": bankex_data[1], "put_price": bankex_data[2], "straddle_price": bankex_data[1] + bankex_data[2]} if bankex_data else None,
+                    "finnifty": {"atm_strike": finnifty_data[0], "call_price": finnifty_data[1], "put_price": finnifty_data[2], "straddle_price": finnifty_data[1] + finnifty_data[2]} if finnifty_data else None,
+                    "midcapnifty": {"atm_strike": midcapnifty_data[0], "call_price": midcapnifty_data[1], "put_price": midcapnifty_data[2], "straddle_price": midcapnifty_data[1] + midcapnifty_data[2]} if midcapnifty_data else None,
+
+                    
+
+
                 }))
                 await asyncio.sleep(2)
 
@@ -100,7 +112,7 @@ class StraddleConsumer(AsyncWebsocketConsumer):
 
     def get_atm_straddle(self, index_type):
         try:
-            symbol_map = {"NIFTY50": "NSE:NIFTY50-INDEX", "SENSEX": "BSE:SENSEX-INDEX"}
+            symbol_map = {"NIFTY50": "NSE:NIFTY50-INDEX", "SENSEX": "BSE:SENSEX-INDEX","BANKEX":"BSE:BANKEX-INDEX","FINNIFTY":"NSE:FINNIFTY-INDEX","MIDCPNIFTY":"NSE:MIDCPNIFTY-INDEX"}
             symbol = symbol_map.get(index_type)
             if not symbol:
                 logging.error("Invalid Index Type: %s", index_type)
@@ -132,6 +144,21 @@ class StraddleConsumer(AsyncWebsocketConsumer):
                 expiry = self.sensex_get_today_expiry()
                 base_symbol = "SENSEX"
                 exchange = "BSE"
+            elif index_type == "BANKEX":
+
+                expiry = self.BANKEX_get_today_expiry()
+                base_symbol = "BANKEX"
+                exchange = "BSE"
+            elif index_type == "FINNIFTY":
+
+                expiry = self.FINNIFTY_get_today_expiry()
+                base_symbol = "FINNIFTY"
+                exchange = "NSE"
+            elif index_type == "MIDCPNIFTY":
+
+                expiry = self.midcap_get_last_thursday_expiry()
+                base_symbol = "MIDCPNIFTY"
+                exchange = "NSE"
             else:
                 logging.error("Invalid Index Type for Expiry Calculation")
                 return None
@@ -139,7 +166,21 @@ class StraddleConsumer(AsyncWebsocketConsumer):
             if not expiry:
                 return None
             
-            base_symbol = "NIFTY" if index_type == "NIFTY50" else "SENSEX"
+            # base_symbol = "NIFTY" if index_type == "NIFTY50" else "SENSEX"
+            if index_type == "NIFTY50":
+                base_symbol = "NIFTY"
+            elif index_type == "SENSEX":
+                base_symbol = "SENSEX"
+            elif index_type == "BANKEX":
+                base_symbol = "BANKEX"
+            elif index_type == "FINNIFTY":
+                base_symbol = "FINNIFTY"
+            elif index_type == "MIDCPNIFTY":
+                base_symbol = "MIDCPNIFTY"
+
+            
+
+            
             atm_call_symbol = f"{exchange}:{base_symbol}{expiry}{atm_strike}CE"
             atm_put_symbol = f"{exchange}:{base_symbol}{expiry}{atm_strike}PE"
             print(atm_call_symbol,atm_put_symbol)
@@ -227,5 +268,57 @@ class StraddleConsumer(AsyncWebsocketConsumer):
         logging.debug(f"Formatted Expiry: {formatted_expiry}")
         return formatted_expiry
      
+    def BANKEX_get_today_expiry(self):
+        """Calculate the last Thursday expiry date of the current month."""
+        today = datetime.date.today()
+        next_month = today.month % 12 + 1
+        next_year = today.year + (1 if next_month == 1 else 0)
+        first_day_next_month = datetime.date(next_year, next_month, 1)
+        last_day_this_month = first_day_next_month - datetime.timedelta(days=1)
+        
+        while last_day_this_month.weekday() != 1:  # Thursday is weekday 3
+            last_day_this_month -= datetime.timedelta(days=1)
+        
+        month_map = {
+            1: "JAN", 2: "FEB", 3: "MAR", 4: "APR", 5: "MAY", 6: "JUN", 
+            7: "JUL", 8: "AUG", 9: "SEP", 10: "OCT", 11: "NOV", 12: "DEC"
+        }
+        print(f"{last_day_this_month.year % 100}{month_map[last_day_this_month.month]}")
+        return f"{last_day_this_month.year % 100}{month_map[last_day_this_month.month]}"
 
-     
+    def FINNIFTY_get_today_expiry(self):
+        """Calculate the last Thursday expiry date of the current month."""
+        today = datetime.date.today()
+        next_month = today.month % 12 + 1
+        next_year = today.year + (1 if next_month == 1 else 0)
+        first_day_next_month = datetime.date(next_year, next_month, 1)
+        last_day_this_month = first_day_next_month - datetime.timedelta(days=1)
+        
+        while last_day_this_month.weekday() != 3:  # Thursday is weekday 3
+            last_day_this_month -= datetime.timedelta(days=1)
+        
+        month_map = {
+            1: "JAN", 2: "FEB", 3: "MAR", 4: "APR", 5: "MAY", 6: "JUN", 
+            7: "JUL", 8: "AUG", 9: "SEP", 10: "OCT", 11: "NOV", 12: "DEC"
+        }
+        print(f"{last_day_this_month.year % 100}{month_map[last_day_this_month.month]}")
+        return f"{last_day_this_month.year % 100}{month_map[last_day_this_month.month]}"
+    
+        
+    def midcap_get_last_thursday_expiry(self):
+        """Calculate the last Thursday expiry date of the current month."""
+        today = datetime.date.today()
+        next_month = today.month % 12 + 1
+        next_year = today.year + (1 if next_month == 1 else 0)
+        first_day_next_month = datetime.date(next_year, next_month, 1)
+        last_day_this_month = first_day_next_month - datetime.timedelta(days=1)
+        
+        while last_day_this_month.weekday() != 3:  # Thursday is weekday 3
+            last_day_this_month -= datetime.timedelta(days=1)
+        
+        month_map = {
+            1: "JAN", 2: "FEB", 3: "MAR", 4: "APR", 5: "MAY", 6: "JUN", 
+            7: "JUL", 8: "AUG", 9: "SEP", 10: "OCT", 11: "NOV", 12: "DEC"
+        }
+        print(f"{last_day_this_month.year % 100}{month_map[last_day_this_month.month]}")
+        return f"{last_day_this_month.year % 100}{month_map[last_day_this_month.month]}"
