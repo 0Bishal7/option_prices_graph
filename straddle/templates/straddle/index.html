@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -71,7 +71,7 @@
     </div>
 
     <script>
-        function createChart(canvasId, label, borderColor, backgroundColor) {
+        function createChart(canvasId, label) {
             const ctx = document.getElementById(canvasId).getContext('2d');
             return new Chart(ctx, {
                 type: 'line',
@@ -79,12 +79,13 @@
                     labels: [],
                     datasets: [{
                         label: label,
-                        borderColor: borderColor,
-                        backgroundColor: backgroundColor,
+                        borderColor: 'blue', // Blue line color
                         borderWidth: 2,
-                        fill: true,
+                        fill: false, // No background fill
                         tension: 0.3,
-                        data: []
+                        data: [],
+                        pointRadius: 0, // Removes circles from the line
+                        pointHoverRadius: 0 // Prevents circles on hover
                     }]
                 },
                 options: {
@@ -108,13 +109,14 @@
                 }
             });
         }
+        
 
         // Create Charts
-        const niftyChart = createChart('niftyChart', 'NIFTY50 Straddle Price', '#ff5733', 'rgba(255, 87, 51, 0.2)');
-        const sensexChart = createChart('sensexChart', 'SENSEX Straddle Price', '#33ff57', 'rgba(51, 255, 87, 0.2)');
-        const bankexChart = createChart('bankexChart', 'BANKEX Straddle Price', '#3399ff', 'rgba(51, 153, 255, 0.2)');
-        const midcapChart = createChart('midcapChart', 'MIDCAPNIFTY Straddle Price', '#ffcc00', 'rgba(255, 204, 0, 0.2)');
-        const finniftyChart = createChart('finniftyChart', 'FINNIFTY Straddle Price', '#ff33aa', 'rgba(255, 51, 170, 0.2)');
+        const niftyChart = createChart('niftyChart', 'NIFTY50 Straddle Price');
+        const sensexChart = createChart('sensexChart', 'SENSEX Straddle Price');
+        const bankexChart = createChart('bankexChart', 'BANKEX Straddle Price');
+        const midcapChart = createChart('midcapChart', 'MIDCAPNIFTY Straddle Price');
+        const finniftyChart = createChart('finniftyChart', 'FINNIFTY Straddle Price');
 
         // WebSocket Connection
         const socket = new WebSocket('ws://localhost:8000/ws/straddle/');
@@ -156,8 +158,9 @@
             console.log(` Chart Updated: ${chart.data.labels.length} points`);
         }
     </script>
+
 </body>
-</html>
+</html> 
 
 
 
