@@ -67,6 +67,8 @@
         <div class="chart-box"><h3>BANKEX</h3><canvas id="bankexChart"></canvas></div>
         <div class="chart-box"><h3>MIDCAPNIFTY</h3><canvas id="midcapChart"></canvas></div>
         <div class="chart-box"><h3>FINNIFTY</h3><canvas id="finniftyChart"></canvas></div>
+        <div class="chart-box"><h3>BANKNIFTY</h3><canvas id="niftybankchart"></canvas></div>
+
     </div>
 
     <script>
@@ -127,6 +129,8 @@
         const bankexChart = createChart('bankexChart', 'BANKEX Straddle Price');
         const midcapChart = createChart('midcapChart', 'MIDCAPNIFTY Straddle Price');
         const finniftyChart = createChart('finniftyChart', 'FINNIFTY Straddle Price');
+        const niftybankchart = createChart('niftybankchart', 'NIFTYBANK Straddle Price');
+
 
         // WebSocket Connection
         const socket = new WebSocket('ws://localhost:8000/ws/straddle/');
@@ -147,6 +151,8 @@
                 if (data.bankex?.straddle_price) updateChart(bankexChart, currentTime, data.bankex.straddle_price);
                 if (data.midcapnifty?.straddle_price) updateChart(midcapChart, currentTime, data.midcapnifty.straddle_price);
                 if (data.finnifty?.straddle_price) updateChart(finniftyChart, currentTime, data.finnifty.straddle_price);
+                if (data.banknifty?.straddle_price) updateChart(niftybankchart, currentTime, data.banknifty.straddle_price);
+
 
             } catch (error) {
                 console.error("Error parsing WebSocket data:", error);
@@ -163,4 +169,3 @@
     </script>
 </body>
 </html>
-

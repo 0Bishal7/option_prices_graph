@@ -43,7 +43,7 @@ class StraddleConsumer(AsyncWebsocketConsumer):
                 bankex_data = await asyncio.to_thread(self.get_atm_straddle, "BANKEX")
                 finnifty_data = await asyncio.to_thread(self.get_atm_straddle, "FINNIFTY")
                 midcapnifty_data = await asyncio.to_thread(self.get_atm_straddle, "MIDCPNIFTY")
-                banknifty_data = await asyncio.to_thread(self.get_atm_straddle, "BANKNIFTY")
+                banknifty_data = await asyncio.to_thread(self.get_atm_straddle, "NIFTYBANK")
                 # BANKNIFTY
 
 
@@ -89,7 +89,7 @@ class StraddleConsumer(AsyncWebsocketConsumer):
                 if banknifty_data:
                     atm_strike, call_price, put_price = banknifty_data
                     straddle_price = call_price + put_price
-                    await asyncio.to_thread(self.save_to_db, "BANKNIFTY", atm_strike, call_price, put_price, straddle_price)
+                    await asyncio.to_thread(self.save_to_db, "NIFTYBANK", atm_strike, call_price, put_price, straddle_price)
                     price_history["banknifty_straddle"].append(straddle_price)
 
                 if len(price_history["timestamps"]) > 100:
@@ -122,7 +122,7 @@ class StraddleConsumer(AsyncWebsocketConsumer):
 
     def get_atm_straddle(self, index_type):
         try:
-            symbol_map = {"NIFTY50": "NSE:NIFTY50-INDEX", "SENSEX": "BSE:SENSEX-INDEX","BANKEX":"BSE:BANKEX-INDEX","FINNIFTY":"NSE:FINNIFTY-INDEX","MIDCPNIFTY":"NSE:MIDCPNIFTY-INDEX","BANKNIFTY": "NSE:BANKNIFTY-INDEX"}
+            symbol_map = {"NIFTY50": "NSE:NIFTY50-INDEX", "SENSEX": "BSE:SENSEX-INDEX","BANKEX":"BSE:BANKEX-INDEX","FINNIFTY":"NSE:FINNIFTY-INDEX","MIDCPNIFTY":"NSE:MIDCPNIFTY-INDEX","NIFTYBANK": "NSE:NIFTYBANK-INDEX"}
             symbol = symbol_map.get(index_type)
             if not symbol:
                 logging.error("Invalid Index Type: %s", index_type)
@@ -169,10 +169,10 @@ class StraddleConsumer(AsyncWebsocketConsumer):
                 expiry = self.midcap_get_last_thursday_expiry()
                 base_symbol = "MIDCPNIFTY"
                 exchange = "NSE"
-            elif index_type == "BANKNIFTY":
+            elif index_type == "NIFTYBANK":
 
                 expiry = self.banknifty_get_last_thursday_expiry()
-                base_symbol = "BANKNIFTY"
+                base_symbol = "NIFTYBANK"
                 exchange = "NSE"
             else:
                 logging.error("Invalid Index Type for Expiry Calculation")
@@ -192,8 +192,8 @@ class StraddleConsumer(AsyncWebsocketConsumer):
                 base_symbol = "FINNIFTY"
             elif index_type == "MIDCPNIFTY":
                 base_symbol = "MIDCPNIFTY"
-            elif index_type == "BANKNIFTY":
-                base_symbol = "BANKNIFTY"
+            elif index_type == "NIFTYBANK":
+                base_symbol = "NIFTYBANK"
             
 
             

@@ -160,28 +160,20 @@ class StraddleConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             logging.error(f"Database Save Error: {e}")
 
-    def get_today_expiry(self):
-        """Get today's expiry date dynamically for NIFTY options."""
+    def banknifty_get_last_thursday_expiry(self):
+        """Calculate the last Thursday expiry date of the current month."""
         today = datetime.date.today()
-        weekday = today.weekday()
-
-        # NIFTY Weekly Expiry on Thursday
-        if weekday < 3:
-            expiry = today + datetime.timedelta(days=(3 - weekday))
-        elif weekday == 3:
-            expiry = today
-        else:
-            expiry = today + datetime.timedelta(days=(7 - weekday + 3))
-
-        # Format the expiry date as per Fyers' symbol format
-        month_map = {
-            1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6", 
-            7: "7", 8: "8", 9: "9", 10: "O", 11: "N", 12: "D"
-        }
+        next_month = today.month % 12 + 1
+        next_year = today.year + (1 if next_month == 1 else 0)
+        first_day_next_month = datetime.date(next_year, next_month, 1)
+        last_day_this_month = first_day_next_month - datetime.timedelta(days=1)
         
-        formatted_expiry = f"{expiry.year % 100:02d}{month_map[expiry.month]}{expiry.day:02d}"
-        logging.debug(f"Formatted Expiry: {formatted_expiry}")
-        return formatted_expiry
-     
-
-     
+        while last_day_this_month.weekday() != 3:  # Thursday is weekday 3
+            last_day_this_month -= datetime.timedelta(days=1)
+        
+        month_map = {
+            1: "JAN", 2: "FEB", 3: "MAR", 4: "APR", 5: "MAY", 6: "JUN", 
+            7: "JUL", 8: "AUG", 9: "SEP", 10: "OCT", 11: "NOV", 12: "DEC"
+        }
+        print(f"{last_day_this_month.year % 100}{month_map[last_day_this_month.month]}")
+        return f"{last_day_this_month.year % 100}{month_map[last_day_this_month.month]}"
