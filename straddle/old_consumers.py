@@ -80,7 +80,7 @@ class StraddleConsumer(AsyncWebsocketConsumer):
     def get_atm_straddle(self):
         """Fetch the ATM straddle price from Fyers API."""
         try:
-            symbol = "NSE:NIFTY50-INDEX"
+            symbol = "NSE:BANKNIFTY-INDEX"
             response = fyers.quotes({"symbols": symbol})
 
             logging.debug(f"Index Response: {response}")  # Debugging
