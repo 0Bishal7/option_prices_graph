@@ -46,7 +46,210 @@
         }
 
         h3 {
+            color: rgb(0, 110, 255);
+            margin-bottom: 10px;
+            font-size: 1.4rem;
+            text-transform: uppercase;
+        }
+
+        .chart-values {
+            font-size: 1rem;
+            margin-top: 10px;
             color: #ffcc00;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 300px !important;
+        }
+    </style>
+</head>
+<body>
+    <h2>Live Straddle Prices</h2>
+
+    <div class="chart-container">
+        <div class="chart-box">
+            <h3>NIFTY50</h3>
+            <canvas id="niftyChart"></canvas>
+            <div class="chart-values" id="niftyValues"></div>
+        </div>
+        <div class="chart-box">
+            <h3>SENSEX</h3>
+            <canvas id="sensexChart"></canvas>
+            <div class="chart-values" id="sensexValues"></div>
+        </div>
+        <div class="chart-box">
+            <h3>BANKEX</h3>
+            <canvas id="bankexChart"></canvas>
+            <div class="chart-values" id="bankexValues"></div>
+        </div>
+        <div class="chart-box">
+            <h3>MIDCAPNIFTY</h3>
+            <canvas id="midcapChart"></canvas>
+            <div class="chart-values" id="midcapValues"></div>
+        </div>
+        <div class="chart-box">
+            <h3>FINNIFTY</h3>
+            <canvas id="finniftyChart"></canvas>
+            <div class="chart-values" id="finniftyValues"></div>
+        </div>
+        <div class="chart-box">
+            <h3>BANKNIFTY</h3>
+            <canvas id="niftybankchart"></canvas>
+            <div class="chart-values" id="bankniftyValues"></div>
+        </div>
+    </div>
+
+    <script>
+        function createChart(canvasId, label) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: generateTimeLabels(),
+                    datasets: [{
+                        label: label,
+                        borderColor: 'blue', 
+                        borderWidth: 2,
+                        fill: false, 
+                        tension: 0.3,
+                        data: new Array(360).fill(null),
+                        pointRadius: 0,
+                        pointHoverRadius: 0 
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { 
+                            title: { display: true, text: 'Time', color: '#000' }, 
+                            ticks: { color: '#fff' }
+                        },
+                        y: { 
+                            title: { display: true, text: 'Straddle Price', color: '#000' }, 
+                            beginAtZero: false,
+                            ticks: { color: '#000' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: true, labels: { color: '#000' } },
+                        tooltip: { enabled: true }
+                    }
+                }
+            });
+        }
+        
+        function generateTimeLabels() {
+            let labels = [];
+            let currentTime = new Date();
+            currentTime.setHours(9, 30, 0, 0);
+            
+            while (currentTime.getHours() < 15 || (currentTime.getHours() === 15 && currentTime.getMinutes() <= 30)) {
+                labels.push(currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                currentTime.setMinutes(currentTime.getMinutes() + 1);
+            }
+            return labels;
+        }
+
+        // Create Charts
+        const niftyChart = createChart('niftyChart', 'NIFTY50 Straddle Price');
+        const sensexChart = createChart('sensexChart', 'SENSEX Straddle Price');
+        const bankexChart = createChart('bankexChart', 'BANKEX Straddle Price');
+        const midcapChart = createChart('midcapChart', 'MIDCAPNIFTY Straddle Price');
+        const finniftyChart = createChart('finniftyChart', 'FINNIFTY Straddle Price');
+        const niftybankchart = createChart('niftybankchart', 'NIFTYBANK Straddle Price');
+
+        // WebSocket Connection
+        const socket = new WebSocket('ws://localhost:8000/ws/straddle/');
+
+        socket.onopen = () => console.log(" WebSocket Connected");
+        socket.onerror = (error) => console.error(" WebSocket Error:", error);
+        socket.onclose = () => console.log(" WebSocket Disconnected");
+
+        socket.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                console.log("🔹 Received Data:", data);
+
+                const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                if (data.nifty) updateChart(niftyChart, 'niftyValues', currentTime, data.nifty);
+                if (data.sensex) updateChart(sensexChart, 'sensexValues', currentTime, data.sensex);
+                if (data.bankex) updateChart(bankexChart, 'bankexValues', currentTime, data.bankex);
+                if (data.midcapnifty) updateChart(midcapChart, 'midcapValues', currentTime, data.midcapnifty);
+                if (data.finnifty) updateChart(finniftyChart, 'finniftyValues', currentTime, data.finnifty);
+                if (data.banknifty) updateChart(niftybankchart, 'bankniftyValues', currentTime, data.banknifty);
+
+            } catch (error) {
+                console.error("Error parsing WebSocket data:", error);
+            }
+        };
+
+        function updateChart(chart, valueId, time, data) {
+            if (!chart || isNaN(data.straddle_price)) return;
+
+            chart.data.datasets[0].data.shift();
+            chart.data.datasets[0].data.push(data.straddle_price);
+            chart.update();
+
+            document.getElementById(valueId).innerHTML = `
+                <b>Index Price:</b> ${data.ltp} <br>
+                <b>Straddle Price:</b> ${data.straddle_price}`;
+        }
+    </script>
+</body>
+</html>
+
+{% comment %} <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Straddle Price</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            text-align: center;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            color: #ffcc00;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .chart-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .chart-box {
+            border-radius: 12px;
+            padding: 20px;
+            background-color: rgba(156, 133, 133, 0.1);
+            box-shadow: 0px 6px 12px rgba(255, 255, 255, 0.1);
+            width: 90%;
+            max-width: 500px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .chart-box:hover {
+            transform: translateY(-5px);
+            box-shadow: 0px 8px 16px rgba(255, 255, 255, 0.2);
+        }
+
+        h3 {
+            color:rgb(0, 110, 255);
             margin-bottom: 10px;
             font-size: 1.4rem;
             text-transform: uppercase;
@@ -168,4 +371,4 @@
         }
     </script>
 </body>
-</html>
+</html> {% endcomment %}

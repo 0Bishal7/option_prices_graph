@@ -7,6 +7,7 @@ class StraddlePrice(models.Model):
     call_price = models.FloatField()
     put_price = models.FloatField()
     straddle_price = models.FloatField()
+    ltp=models.FloatField(default=0.0)
 
     def __str__(self):
         return f"{self.timestamp} | {self.index_type}: {self.straddle_price}"

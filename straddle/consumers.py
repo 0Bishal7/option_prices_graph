@@ -8,6 +8,9 @@ from fyers_apiv3 import fyersModel
 from dotenv import load_dotenv
 from .models import StraddlePrice
 
+
+
+
 load_dotenv()
 
 ACCESS_TOKEN = os.getenv("FYERS_ACCESS_TOKEN")
@@ -20,7 +23,8 @@ fyers = fyersModel.FyersModel(client_id=CLIENT_ID, token=ACCESS_TOKEN, is_async=
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-price_history = {"timestamps": [], "nifty_straddle": [], "sensex_straddle": [],"bankex_straddle":[],"finnifty_straddle":[],"midcapnifty_straddle":[],"banknifty_straddle":[],}
+price_history = {"timestamps": [], "nifty_straddle": [], "sensex_straddle": [],"bankex_straddle":[],"finnifty_straddle":[],"midcapnifty_straddle":[],"banknifty_straddle":[]}
+logger = logging.getLogger(__name__)
 
 class StraddleConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -34,16 +38,19 @@ class StraddleConsumer(AsyncWebsocketConsumer):
         """Handle WebSocket disconnection."""
         self.is_active = False
         logging.warning(f"WebSocket Disconnected. Close Code: {close_code}")
-    
+
     async def fetch_and_send_data(self):
         while self.is_active:
             try:
-                nifty_data = await asyncio.to_thread(self.get_atm_straddle, "NIFTY50")
+                nifty_data = await asyncio.to_thread(self.get_atm_straddle, "NIFTY50") 
                 sensex_data = await asyncio.to_thread(self.get_atm_straddle, "SENSEX")
                 bankex_data = await asyncio.to_thread(self.get_atm_straddle, "BANKEX")
                 finnifty_data = await asyncio.to_thread(self.get_atm_straddle, "FINNIFTY")
                 midcapnifty_data = await asyncio.to_thread(self.get_atm_straddle, "MIDCPNIFTY")
                 banknifty_data = await asyncio.to_thread(self.get_atm_straddle, "NIFTYBANK")
+                
+                
+
                 # BANKNIFTY
 
 
@@ -52,45 +59,51 @@ class StraddleConsumer(AsyncWebsocketConsumer):
                 timestamp = datetime.datetime.now().strftime("%H:%M:%S")
 
                 if nifty_data:
-                    atm_strike, call_price, put_price = nifty_data
+                    atm_strike, call_price, put_price,ltp = nifty_data
                     straddle_price = call_price + put_price
-                    await asyncio.to_thread(self.save_to_db, "NIFTY50", atm_strike, call_price, put_price, straddle_price)
+                    await asyncio.to_thread(self.save_to_db, "NIFTY50", atm_strike, call_price, put_price, straddle_price,ltp)
                     price_history["timestamps"].append(timestamp)
                     price_history["nifty_straddle"].append(straddle_price)
+                    
 
                 if sensex_data:
-                    atm_strike, call_price, put_price = sensex_data
+                    atm_strike, call_price, put_price ,ltp= sensex_data
                     straddle_price = call_price + put_price
-                    await asyncio.to_thread(self.save_to_db, "SENSEX", atm_strike, call_price, put_price, straddle_price)
+                    await asyncio.to_thread(self.save_to_db, "SENSEX", atm_strike, call_price, put_price, straddle_price,ltp)
                     price_history["sensex_straddle"].append(straddle_price)
+
 
                 
                 if bankex_data:
-                    atm_strike, call_price, put_price = bankex_data
+                    atm_strike, call_price, put_price,ltp = bankex_data
                     straddle_price = call_price + put_price
-                    await asyncio.to_thread(self.save_to_db, "BANKEX", atm_strike, call_price, put_price, straddle_price)
+                    await asyncio.to_thread(self.save_to_db, "BANKEX", atm_strike, call_price, put_price, straddle_price,ltp)
                     price_history["bankex_straddle"].append(straddle_price)
+
 
                 
                 if finnifty_data:
-                    atm_strike, call_price, put_price = finnifty_data
+                    atm_strike, call_price, put_price ,ltp= finnifty_data
                     straddle_price = call_price + put_price
-                    await asyncio.to_thread(self.save_to_db, "FINNIFTY", atm_strike, call_price, put_price, straddle_price)
+                    await asyncio.to_thread(self.save_to_db, "FINNIFTY", atm_strike, call_price, put_price, straddle_price,ltp)
                     price_history["finnifty_straddle"].append(straddle_price)
+
                 
 
                 if midcapnifty_data:
-                    atm_strike, call_price, put_price = midcapnifty_data
+                    atm_strike, call_price, put_price ,ltp= midcapnifty_data
                     straddle_price = call_price + put_price
-                    await asyncio.to_thread(self.save_to_db, "MIDCPNIFTY", atm_strike, call_price, put_price, straddle_price)
+                    await asyncio.to_thread(self.save_to_db, "MIDCPNIFTY", atm_strike, call_price, put_price, straddle_price,ltp)
                     price_history["midcapnifty_straddle"].append(straddle_price)
+
 
                 
                 if banknifty_data:
-                    atm_strike, call_price, put_price = banknifty_data
+                    atm_strike, call_price, put_price,ltp = banknifty_data
                     straddle_price = call_price + put_price
-                    await asyncio.to_thread(self.save_to_db, "NIFTYBANK", atm_strike, call_price, put_price, straddle_price)
+                    await asyncio.to_thread(self.save_to_db, "NIFTYBANK", atm_strike, call_price, put_price, straddle_price,ltp)
                     price_history["banknifty_straddle"].append(straddle_price)
+
 
                 if len(price_history["timestamps"]) > 100:
                     price_history["timestamps"].pop(0)
@@ -104,22 +117,24 @@ class StraddleConsumer(AsyncWebsocketConsumer):
 
 
 
-
                 await self.send(json.dumps({
                     "timestamp": timestamp,
-                    "nifty": {"atm_strike": nifty_data[0], "call_price": nifty_data[1], "put_price": nifty_data[2], "straddle_price": nifty_data[1] + nifty_data[2]} if nifty_data else None,
-                    "sensex": {"atm_strike": sensex_data[0], "call_price": sensex_data[1], "put_price": sensex_data[2], "straddle_price": sensex_data[1] + sensex_data[2]} if sensex_data else None,
-                    "bankex": {"atm_strike": bankex_data[0], "call_price": bankex_data[1], "put_price": bankex_data[2], "straddle_price": bankex_data[1] + bankex_data[2]} if bankex_data else None,
-                    "finnifty": {"atm_strike": finnifty_data[0], "call_price": finnifty_data[1], "put_price": finnifty_data[2], "straddle_price": finnifty_data[1] + finnifty_data[2]} if finnifty_data else None,
-                    "midcapnifty": {"atm_strike": midcapnifty_data[0], "call_price": midcapnifty_data[1], "put_price": midcapnifty_data[2], "straddle_price": midcapnifty_data[1] + midcapnifty_data[2]} if midcapnifty_data else None,
-                    "banknifty": {"atm_strike": banknifty_data[0], "call_price": banknifty_data[1], "put_price": banknifty_data[2], "straddle_price": banknifty_data[1] + banknifty_data[2]} if banknifty_data else None,
-
+                    "nifty": {"atm_strike": nifty_data[0], "call_price": nifty_data[1], "put_price": nifty_data[2], "straddle_price": nifty_data[1] + nifty_data[2], "ltp": nifty_data[3] if nifty_data else None},
+                    "sensex": {"atm_strike": sensex_data[0], "call_price": sensex_data[1], "put_price": sensex_data[2], "straddle_price": sensex_data[1] + sensex_data[2], "ltp": sensex_data[3] if sensex_data else None},
+                    "bankex": {"atm_strike": bankex_data[0], "call_price": bankex_data[1], "put_price": bankex_data[2], "straddle_price": bankex_data[1] + bankex_data[2], "ltp": bankex_data[3] if bankex_data else None},
+                    "finnifty": {"atm_strike": finnifty_data[0], "call_price": finnifty_data[1], "put_price": finnifty_data[2], "straddle_price": finnifty_data[1] + finnifty_data[2], "ltp": finnifty_data[3] if finnifty_data else None},
+                    "midcapnifty": {"atm_strike": midcapnifty_data[0], "call_price": midcapnifty_data[1], "put_price": midcapnifty_data[2], "straddle_price": midcapnifty_data[1] + midcapnifty_data[2], "ltp": midcapnifty_data[3] if midcapnifty_data else None},
+                    "banknifty": {"atm_strike": banknifty_data[0], "call_price": banknifty_data[1], "put_price": banknifty_data[2], "straddle_price": banknifty_data[1] + banknifty_data[2], "ltp": banknifty_data[3] if banknifty_data else None},
                 }))
-                await asyncio.sleep(1)
+
+               
+                await asyncio.sleep(10)
+                # time.sleep(10)  # Use time.sleep() in a synchronous function
+
 
             except Exception as e:
                 logging.error(f"WebSocket Error: {e}")
-
+    
     def get_atm_straddle(self, index_type):
         try:
             symbol_map = {"NIFTY50": "NSE:NIFTY50-INDEX", "SENSEX": "BSE:SENSEX-INDEX","BANKEX":"BSE:BANKEX-INDEX","FINNIFTY":"NSE:FINNIFTY-INDEX","MIDCPNIFTY":"NSE:MIDCPNIFTY-INDEX","NIFTYBANK": "NSE:NIFTYBANK-INDEX"}
@@ -226,22 +241,23 @@ class StraddleConsumer(AsyncWebsocketConsumer):
                 logging.error("Failed to fetch option prices")
                 return None
 
-            return atm_strike, call_price, put_price
+            return atm_strike, call_price, put_price,ltp
 
         except Exception as e:
             logging.error(f"API Error: {e}")
             return None
 
-    def save_to_db(self, index_name, atm_strike, call_price, put_price, straddle_price):
+    def save_to_db(self, index_name, atm_strike, call_price, put_price, straddle_price,ltp):
         try:
             StraddlePrice.objects.create(
                 index_name=index_name,
                 atm_strike=atm_strike,
                 call_price=call_price,
                 put_price=put_price,
-                straddle_price=straddle_price
+                straddle_price=straddle_price,
+                ltp=ltp
             )
-            logging.info(f"Data Saved: {index_name} | {atm_strike} | {call_price} | {put_price} | {straddle_price}")
+            logging.info(f"Data Saved: {index_name} | {atm_strike} | {call_price} | {put_price} | {straddle_price}|{ltp}")
         except Exception as e:
             logging.error(f"Database Save Error: {e}")
 
@@ -358,3 +374,4 @@ class StraddleConsumer(AsyncWebsocketConsumer):
         }
         print(f"{last_day_this_month.year % 100}{month_map[last_day_this_month.month]}")
         return f"{last_day_this_month.year % 100}{month_map[last_day_this_month.month]}"
+    
