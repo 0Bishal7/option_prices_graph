@@ -42,69 +42,77 @@ class StraddleConsumer(AsyncWebsocketConsumer):
     async def fetch_and_send_data(self):
         while self.is_active:
             try:
+                now = datetime.datetime.now()
+                market_open = now.replace(hour=9, minute=15, second=0, microsecond=0)
+                market_close = now.replace(hour=15, minute=30, second=0, microsecond=0)
+
+                # If market is closed, clear the data and stop updating
+                if now > market_close:
+                    price_history["timestamps"].clear()
+                    price_history["nifty_straddle"].clear()
+                    price_history["sensex_straddle"].clear()
+                    price_history["bankex_straddle"].clear()
+                    price_history["finnifty_straddle"].clear()
+                    price_history["midcapnifty_straddle"].clear()
+                    price_history["banknifty_straddle"].clear()
+                    logging.info("Market closed. Cleared price history.")
+                    await asyncio.sleep(60)  # Check every minute to resume next day
+                    continue
+                
+                # If before market opens, wait and check again
+                if now < market_open:
+                    logging.info("Market not open yet. Waiting...")
+                    await asyncio.sleep(60)
+                    continue
+
+                # Fetch data every second during market hours
                 nifty_data = await asyncio.to_thread(self.get_atm_straddle, "NIFTY50") 
                 sensex_data = await asyncio.to_thread(self.get_atm_straddle, "SENSEX")
                 bankex_data = await asyncio.to_thread(self.get_atm_straddle, "BANKEX")
                 finnifty_data = await asyncio.to_thread(self.get_atm_straddle, "FINNIFTY")
                 midcapnifty_data = await asyncio.to_thread(self.get_atm_straddle, "MIDCPNIFTY")
                 banknifty_data = await asyncio.to_thread(self.get_atm_straddle, "NIFTYBANK")
-                
-                
 
-                # BANKNIFTY
-
-
-
-
-                timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+                timestamp = now.strftime("%H:%M:%S")
 
                 if nifty_data:
-                    atm_strike, call_price, put_price,ltp = nifty_data
+                    atm_strike, call_price, put_price, ltp = nifty_data
                     straddle_price = call_price + put_price
-                    await asyncio.to_thread(self.save_to_db, "NIFTY50", atm_strike, call_price, put_price, straddle_price,ltp)
+                    await asyncio.to_thread(self.save_to_db, "NIFTY50", atm_strike, call_price, put_price, straddle_price, ltp)
                     price_history["timestamps"].append(timestamp)
                     price_history["nifty_straddle"].append(straddle_price)
-                    
 
                 if sensex_data:
-                    atm_strike, call_price, put_price ,ltp= sensex_data
+                    atm_strike, call_price, put_price, ltp = sensex_data
                     straddle_price = call_price + put_price
-                    await asyncio.to_thread(self.save_to_db, "SENSEX", atm_strike, call_price, put_price, straddle_price,ltp)
+                    await asyncio.to_thread(self.save_to_db, "SENSEX", atm_strike, call_price, put_price, straddle_price, ltp)
                     price_history["sensex_straddle"].append(straddle_price)
 
-
-                
                 if bankex_data:
-                    atm_strike, call_price, put_price,ltp = bankex_data
+                    atm_strike, call_price, put_price, ltp = bankex_data
                     straddle_price = call_price + put_price
-                    await asyncio.to_thread(self.save_to_db, "BANKEX", atm_strike, call_price, put_price, straddle_price,ltp)
+                    await asyncio.to_thread(self.save_to_db, "BANKEX", atm_strike, call_price, put_price, straddle_price, ltp)
                     price_history["bankex_straddle"].append(straddle_price)
 
-
-                
                 if finnifty_data:
-                    atm_strike, call_price, put_price ,ltp= finnifty_data
+                    atm_strike, call_price, put_price, ltp = finnifty_data
                     straddle_price = call_price + put_price
-                    await asyncio.to_thread(self.save_to_db, "FINNIFTY", atm_strike, call_price, put_price, straddle_price,ltp)
+                    await asyncio.to_thread(self.save_to_db, "FINNIFTY", atm_strike, call_price, put_price, straddle_price, ltp)
                     price_history["finnifty_straddle"].append(straddle_price)
 
-                
-
                 if midcapnifty_data:
-                    atm_strike, call_price, put_price ,ltp= midcapnifty_data
+                    atm_strike, call_price, put_price, ltp = midcapnifty_data
                     straddle_price = call_price + put_price
-                    await asyncio.to_thread(self.save_to_db, "MIDCPNIFTY", atm_strike, call_price, put_price, straddle_price,ltp)
+                    await asyncio.to_thread(self.save_to_db, "MIDCPNIFTY", atm_strike, call_price, put_price, straddle_price, ltp)
                     price_history["midcapnifty_straddle"].append(straddle_price)
 
-
-                
                 if banknifty_data:
-                    atm_strike, call_price, put_price,ltp = banknifty_data
+                    atm_strike, call_price, put_price, ltp = banknifty_data
                     straddle_price = call_price + put_price
-                    await asyncio.to_thread(self.save_to_db, "NIFTYBANK", atm_strike, call_price, put_price, straddle_price,ltp)
+                    await asyncio.to_thread(self.save_to_db, "NIFTYBANK", atm_strike, call_price, put_price, straddle_price, ltp)
                     price_history["banknifty_straddle"].append(straddle_price)
 
-
+                # Maintain only the last 100 records
                 if len(price_history["timestamps"]) > 100:
                     price_history["timestamps"].pop(0)
                     price_history["nifty_straddle"].pop(0)
@@ -114,9 +122,7 @@ class StraddleConsumer(AsyncWebsocketConsumer):
                     price_history["midcapnifty_straddle"].pop(0)
                     price_history["banknifty_straddle"].pop(0)
 
-
-
-
+                # Send data to frontend every second
                 await self.send(json.dumps({
                     "timestamp": timestamp,
                     "nifty": {"atm_strike": nifty_data[0], "call_price": nifty_data[1], "put_price": nifty_data[2], "straddle_price": nifty_data[1] + nifty_data[2], "ltp": nifty_data[3] if nifty_data else None},
@@ -127,14 +133,11 @@ class StraddleConsumer(AsyncWebsocketConsumer):
                     "banknifty": {"atm_strike": banknifty_data[0], "call_price": banknifty_data[1], "put_price": banknifty_data[2], "straddle_price": banknifty_data[1] + banknifty_data[2], "ltp": banknifty_data[3] if banknifty_data else None},
                 }))
 
-               
-                await asyncio.sleep(10)
-                # time.sleep(10)  # Use time.sleep() in a synchronous function
-
+                await asyncio.sleep(1)  # Update every second
 
             except Exception as e:
                 logging.error(f"WebSocket Error: {e}")
-    
+
     def get_atm_straddle(self, index_type):
         try:
             symbol_map = {"NIFTY50": "NSE:NIFTY50-INDEX", "SENSEX": "BSE:SENSEX-INDEX","BANKEX":"BSE:BANKEX-INDEX","FINNIFTY":"NSE:FINNIFTY-INDEX","MIDCPNIFTY":"NSE:MIDCPNIFTY-INDEX","NIFTYBANK": "NSE:NIFTYBANK-INDEX"}
